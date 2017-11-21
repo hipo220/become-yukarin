@@ -378,31 +378,26 @@ def create(config: DatasetConfig):
         )),
         LambdaProcess(lambda d, test: dict(input=d['input'], target=d['target']['feature'], mask=d['target']['mask'])),
         ShapeAlignProcess(),
+        SplitProcess(dict(
+            input=ChainProcess([
+                LambdaProcess(lambda d, test: d['input']),
+                LastPaddingProcess(min_size=config.train_crop_size),
+                FirstCropProcess(crop_size=config.train_crop_size),
+            ]),
+            target=ChainProcess([
+                LambdaProcess(lambda d, test: d['target']),
+                LastPaddingProcess(min_size=config.train_crop_size),
+                FirstCropProcess(crop_size=config.train_crop_size),
+            ]),
+            mask=ChainProcess([
+                LambdaProcess(lambda d, test: d['mask']),
+                LastPaddingProcess(min_size=config.train_crop_size),
+                FirstCropProcess(crop_size=config.train_crop_size),
+            ]),
+        )),
     ])
 
     data_process_train = copy.deepcopy(data_process_base)
-
-    def add_seed():
-        return LambdaProcess(lambda d, test: dict(seed=numpy.random.randint(2 ** 32), **d))
-
-    def padding(s):
-        return ChainProcess([
-            LambdaProcess(lambda d, test: dict(data=d[s], seed=d['seed'])),
-            RandomPaddingProcess(min_size=config.train_crop_size),
-        ])
-
-    def crop(s):
-        return ChainProcess([
-            LambdaProcess(lambda d, test: dict(data=d[s], seed=d['seed'])),
-            RandomCropProcess(crop_size=config.train_crop_size),
-        ])
-
-    data_process_train.append(ChainProcess([
-        add_seed(),
-        SplitProcess(dict(input=padding('input'), target=padding('target'), mask=padding('mask'))),
-        add_seed(),
-        SplitProcess(dict(input=crop('input'), target=crop('target'), mask=crop('mask'))),
-    ]))
 
     # add noise
     data_process_train.append(SplitProcess(dict(
@@ -419,24 +414,7 @@ def create(config: DatasetConfig):
         ]),
     )))
 
-    data_process_test = data_process_base
-    data_process_test.append(SplitProcess(dict(
-        input=ChainProcess([
-            LambdaProcess(lambda d, test: d['input']),
-            LastPaddingProcess(min_size=config.train_crop_size),
-            FirstCropProcess(crop_size=config.train_crop_size),
-        ]),
-        target=ChainProcess([
-            LambdaProcess(lambda d, test: d['target']),
-            LastPaddingProcess(min_size=config.train_crop_size),
-            FirstCropProcess(crop_size=config.train_crop_size),
-        ]),
-        mask=ChainProcess([
-            LambdaProcess(lambda d, test: d['mask']),
-            LastPaddingProcess(min_size=config.train_crop_size),
-            FirstCropProcess(crop_size=config.train_crop_size),
-        ]),
-    )))
+    data_process_test = copy.deepcopy(data_process_base)
 
     num_test = config.num_test
     pairs = [
